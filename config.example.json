@@ -1,0 +1,7 @@
+{
+    "server"  : "smtp.qq.com:465",
+    "username": "admin@example.com",
+    "password": "password",
+    "from"    : "admin@example.com",
+    "to"      : "admin@example.com"
+}
