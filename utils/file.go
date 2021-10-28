@@ -56,6 +56,47 @@ func RemoveChunk(parts []string) {
 	}
 }
 
+func CopyChunk(dst io.Writer, src io.Reader, need int64, buf []byte) (written int64, err error) {
+	if buf == nil {
+		buf = make([]byte, 32*1024)
+	}
+
+	size := len(buf)
+	for {
+		nr, er := src.Read(buf)
+
+		distance := need - written
+		if distance <= 0 {
+			break
+		}
+		if distance < int64(size) {
+			nr = int(distance)
+		}
+
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
+}
+
 func Sha1File(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
