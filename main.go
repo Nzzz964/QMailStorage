@@ -25,7 +25,7 @@ func init() {
 
 func checkArgs() {
 	if f == "" {
-		fmt.Fprintln(os.Stderr, "请指定上传文件")
+		fmt.Fprintln(os.Stderr, "请指定上传文件 : qmailstorage.exe -f example.txt")
 		os.Exit(1)
 	}
 }
