@@ -1,20 +1,39 @@
 package client
 
 import (
+	"bufio"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/mail"
+	"os"
 	"strings"
 )
 
 const boundary string = "x5fvTI9ZR9aZ"
 
+type Attachment struct {
+	Name string
+	Path string
+}
 type Mail struct {
 	From    mail.Address
 	To      mail.Address
 	subject string
-	body    []string
+	text    string
+	attach  []Attachment
+}
+
+var MIMEAttachment string
+
+func init() {
+	MIMEAttachment = strings.Join([]string{
+		fmt.Sprintf("--%s", boundary),
+		"Content-Type: text/plain; charset=\"utf-8\"",
+		"Content-Transfer-Encoding: base64",
+		"Content-Disposition: attachment; filename=\"%s\"",
+		"",
+	}, "\r\n")
 }
 
 func NewMail(from string, to string) *Mail {
@@ -38,7 +57,7 @@ func (mail *Mail) Text(msg string) *Mail {
 		msg,
 	}, "\r\n")
 
-	mail.body = append(mail.body, message)
+	mail.text = message
 	return mail
 }
 
@@ -50,39 +69,18 @@ func (mail *Mail) Html(msg string) *Mail {
 		"",
 		msg,
 	}, "\r\n")
-	mail.body = append(mail.body, message)
+	mail.text = message
 	return mail
 }
 
-func (mail *Mail) Attach(path string, name string) (*Mail, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return mail, err
-	}
-
-	message := strings.Join([]string{
-		fmt.Sprintf("--%s", boundary),
-		"Content-Type: text/plain; charset=\"utf-8\"",
-		"Content-Transfer-Encoding: base64",
-		"Content-Disposition: attachment; filename=\"" + name + "\"",
-		"",
-		base64.StdEncoding.EncodeToString(data),
-	}, "\r\n")
-
-	mail.body = append(mail.body, message)
-	return mail, nil
+func (mail *Mail) Attach(path string, name string) *Mail {
+	mail.attach = append(mail.attach, Attachment{name, path})
+	return mail
 }
 
 func (mail *Mail) Reset() *Mail {
-	mail.body = nil
+	mail.attach = nil
 	return mail
-}
-
-func (mail *Mail) Build() string {
-	return strings.Join([]string{
-		mail.header(),
-		strings.Join(mail.body, "\r\n\r\n"),
-	}, "\r\n\r\n")
 }
 
 func (mail *Mail) header() string {
@@ -93,4 +91,56 @@ func (mail *Mail) header() string {
 		"MIME-Version: 1.0",
 		fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"", boundary),
 	}, "\r\n")
+}
+
+func (mail *Mail) WriteTo(w io.Writer) (n int64, err error) {
+	writer := bufio.NewWriter(w)
+	nw, err := writer.WriteString(mail.header())
+	n += int64(nw)
+	if err != nil {
+		return n, err
+	}
+	nw, err = writer.WriteString("\r\n\r\n")
+	n += int64(nw)
+	if err != nil {
+		return n, err
+	}
+	nw, err = writer.WriteString(mail.text)
+	n += int64(nw)
+	if err != nil {
+		return n, err
+	}
+	nw, err = writer.WriteString("\r\n\r\n")
+	n += int64(nw)
+	if err != nil {
+		return n, err
+	}
+	for _, attachment := range mail.attach {
+		nw, err = writer.WriteString(fmt.Sprintf(MIMEAttachment, attachment.Name))
+		n += int64(nw)
+		if err != nil {
+			return n, err
+		}
+		nw, err = writer.WriteString("\r\n")
+		n += int64(nw)
+		if err != nil {
+			return n, err
+		}
+		f, err := os.Open(attachment.Path)
+		if err != nil {
+			return n, err
+		}
+		reader := bufio.NewReader(f)
+		enc := base64.StdEncoding
+		base64Writer := base64.NewEncoder(enc, writer)
+		reader.WriteTo(base64Writer)
+		base64Writer.Close()
+		f.Close()
+		nw, err = writer.WriteString("\r\n\r\n")
+		n += int64(nw)
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
 }

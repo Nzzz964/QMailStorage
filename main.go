@@ -41,18 +41,18 @@ func main() {
 		log.Panic(err)
 	}
 
-	_client, err := client.NewClient(config.Server, config.Username, config.Password)
+	smtpClient, err := client.NewClient(config.Server, config.Username, config.Password)
 	if err != nil {
 		log.Panic(err)
 	}
-	defer _client.Close()
+	defer smtpClient.Close()
 
 	fileInfo, err := os.Stat(f)
 	if os.IsNotExist(err) {
 		log.Panic(err)
 	}
 
-	baseName := fileInfo.Name()
+	basename := fileInfo.Name()
 	sha1str, err := utils.Sha1File(f)
 	if err != nil {
 		log.Println("计算文件 sha1 失败")
@@ -68,35 +68,34 @@ func main() {
 
 	defer utils.RemoveChunk(chunks)
 
-	_mail := client.NewMail(config.From, config.To)
+	mime := client.NewMail(config.From, config.To)
 	log.Println("总分片数: " + fmt.Sprint(len(chunks)))
 
 	for k, v := range chunks {
 		chunkBaseName := path.Base(v)
-		_mail.Subject("文件: " + baseName + " 分片: " + fmt.Sprintf("%d", k))
-		_mail.Text(strings.Join([]string{
+		mime.Subject("文件: " + basename + " 分片: " + fmt.Sprintf("%d", k))
+		mime.Text(strings.Join([]string{
 			"sha1: " + sha1str,
 			"file: " + path.Base(v),
 		}, " \n"))
-		if _, err = _mail.Attach(v, chunkBaseName); err != nil {
+		mime.Attach(v, chunkBaseName)
+
+		if err = smtpClient.Mail(config.From); err != nil {
+			log.Panic(err)
+		}
+		if err = smtpClient.Rcpt(config.To); err != nil {
 			log.Panic(err)
 		}
 
-		if err = _client.Mail(config.From); err != nil {
-			log.Panic(err)
-		}
-		if err = _client.Rcpt(config.To); err != nil {
-			log.Panic(err)
-		}
-
-		writer, err := _client.Data()
+		writer, err := smtpClient.Data()
 		if err != nil {
 			log.Panic(err)
 		}
 
 		log.Println("发送分片:", k)
-		writer.Write([]byte(_mail.Build()))
-		_mail.Reset()
+		mime.WriteTo(writer)
+
+		mime.Reset()
 		writer.Close()
 	}
 

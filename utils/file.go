@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -16,34 +15,28 @@ func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 		return nil, err
 	}
 
-	f, err := os.Open(filepath)
+	src, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer src.Close()
 
 	parts := []string{}
-	bufffer := make([]byte, chunkSize)
 	filesize := info.Size()
 	filename := info.Name()
 	loop := math.Ceil(float64(filesize) / float64(chunkSize))
 
 	for i := 0; i < int(loop); i++ {
 		off := int64(i) * chunkSize
-
-		readSize, err := f.ReadAt(bufffer, off)
-		if err != nil && err != io.EOF {
-			return parts, err
-		}
-
+		src.Seek(off, io.SeekStart)
 		tmpName := filename + ".part" + fmt.Sprint(i)
 		tmpPath := path.Join(os.TempDir(), tmpName)
-
-		err = ioutil.WriteFile(tmpPath, bufffer[:readSize], 0644)
+		dst, err := os.Create(tmpPath)
 		if err != nil {
 			return parts, err
 		}
 
+		CopyChunk(dst, src, chunkSize, nil)
 		parts = append(parts, tmpPath)
 	}
 
