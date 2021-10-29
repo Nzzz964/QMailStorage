@@ -142,5 +142,8 @@ func (mail *Mail) WriteTo(w io.Writer) (n int64, err error) {
 			return n, err
 		}
 	}
+	if b := writer.Buffered(); b > 0 {
+		writer.Flush()
+	}
 	return n, nil
 }
