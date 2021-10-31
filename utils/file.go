@@ -38,6 +38,7 @@ func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 
 		CopyChunk(dst, src, chunkSize, nil)
 		parts = append(parts, tmpPath)
+		dst.Close()
 	}
 
 	return parts, nil
@@ -45,7 +46,7 @@ func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 
 func RemoveChunk(parts []string) {
 	for _, v := range parts {
-		_ = os.Remove(v)
+		os.Remove(v)
 	}
 }
 
