@@ -1,7 +1,7 @@
+name: auto release binary
 on: 
   release:
     types: [created]
-
 jobs:
   releases:
     name: Release Go Binary
