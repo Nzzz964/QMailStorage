@@ -7,18 +7,17 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"qmailstorage/client"
-	"qmailstorage/utils"
-	"strings"
 )
 
 var c string
 var f string
+var d string
 
 func init() {
 	flag.StringVar(&c, "c", "config.json", "指定配置文件")
 	flag.StringVar(&f, "f", "", "指定上传文件")
+	flag.StringVar(&d, "d", "", "文件描述")
 	flag.Parse()
 	checkArgs()
 }
@@ -42,63 +41,22 @@ func main() {
 		log.Panic(err)
 	}
 
+	// 初始化 smtp 客户端
 	smtpClient, err := client.NewClient(config.Server, config.Username, config.Password)
 	if err != nil {
 		log.Panic(err)
 	}
 	defer smtpClient.Close()
 
-	fileInfo, err := os.Stat(f)
-	if os.IsNotExist(err) {
+	sender, err := client.NewQMailSender(smtpClient, f, config.Chunksize)
+	if err != nil {
 		log.Panic(err)
 	}
+	defer sender.Destory()
 
-	basename := fileInfo.Name()
-	sha1str, err := utils.Sha1File(f)
+	sender.Description(d)
+	err = sender.Send(config.From, config.To)
 	if err != nil {
-		log.Println("计算文件 sha1 失败")
-	}
-
-	chunks, err := utils.MakeChunk(f, config.Chunksize)
-	if err != nil {
-		if len(chunks) > 0 {
-			utils.RemoveChunk(chunks)
-		}
 		log.Panic(err)
 	}
-
-	defer utils.RemoveChunk(chunks)
-	mime := client.NewMail(config.From, config.To)
-	log.Println("总分片数: " + fmt.Sprint(len(chunks)))
-
-	for k, v := range chunks {
-		chunkBaseName := path.Base(v)
-		mime.Subject("文件: " + basename + " 分片: " + fmt.Sprintf("%d", k))
-		mime.Text(strings.Join([]string{
-			"sha1: " + sha1str,
-			"file: " + path.Base(v),
-		}, " \n"))
-		mime.Attach(v, chunkBaseName)
-
-		if err = smtpClient.Mail(config.From); err != nil {
-			log.Panic(err)
-		}
-		if err = smtpClient.Rcpt(config.To); err != nil {
-			log.Panic(err)
-		}
-
-		func() {
-			writer, err := smtpClient.Data()
-			if err != nil {
-				log.Panic(err)
-			}
-			defer writer.Close()
-
-			log.Println("发送分片:", k)
-			mime.WriteTo(writer)
-		}()
-
-		mime.Reset()
-	}
-
 }
