@@ -9,6 +9,7 @@ import (
 	"path"
 )
 
+// 将文件分割成指定大小的块
 func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 	info, err := os.Stat(filepath)
 	if err != nil {
@@ -28,6 +29,7 @@ func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 
 	for i := 0; i < int(loop); i++ {
 		off := int64(i) * chunkSize
+		// file descriptor 偏移量
 		src.Seek(off, io.SeekStart)
 		tmpName := filename + ".part" + fmt.Sprint(i)
 		tmpPath := path.Join(os.TempDir(), tmpName)
@@ -35,8 +37,12 @@ func MakeChunk(filepath string, chunkSize int64) ([]string, error) {
 		if err != nil {
 			return parts, err
 		}
+		// 从指定 src 偏移量开始复制 `chunkSize` 大小的数据到 dst
+		_, err = CopyChunk(dst, src, chunkSize, nil)
+		if err != nil {
+			return parts, err
+		}
 
-		CopyChunk(dst, src, chunkSize, nil)
 		parts = append(parts, tmpPath)
 		dst.Close()
 	}
