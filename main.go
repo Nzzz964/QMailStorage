@@ -31,6 +31,7 @@ func checkArgs() {
 }
 
 func main() {
+	// 读取配置文件
 	data, err := ioutil.ReadFile(c)
 	if err != nil {
 		log.Panic(err)
@@ -67,7 +68,6 @@ func main() {
 	}
 
 	defer utils.RemoveChunk(chunks)
-
 	mime := client.NewMail(config.From, config.To)
 	log.Println("总分片数: " + fmt.Sprint(len(chunks)))
 
@@ -87,16 +87,18 @@ func main() {
 			log.Panic(err)
 		}
 
-		writer, err := smtpClient.Data()
-		if err != nil {
-			log.Panic(err)
-		}
+		func() {
+			writer, err := smtpClient.Data()
+			if err != nil {
+				log.Panic(err)
+			}
+			defer writer.Close()
 
-		log.Println("发送分片:", k)
-		mime.WriteTo(writer)
+			log.Println("发送分片:", k)
+			mime.WriteTo(writer)
+		}()
 
 		mime.Reset()
-		writer.Close()
 	}
 
 }

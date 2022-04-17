@@ -94,8 +94,12 @@ func (mail *Mail) header() string {
 }
 
 func (mail *Mail) WriteTo(w io.Writer) (n int64, err error) {
+	// 使用 bufio
 	writer := bufio.NewWriter(w)
+	defer writer.Flush()
+
 	nw, err := writer.WriteString(mail.header())
+
 	n += int64(nw)
 	if err != nil {
 		return n, err
@@ -126,24 +130,32 @@ func (mail *Mail) WriteTo(w io.Writer) (n int64, err error) {
 		if err != nil {
 			return n, err
 		}
-		f, err := os.Open(attachment.Path)
+
+		// 立即执行函数 (Closure
+		nw2, err := func() (n int64, err error) {
+			f, err := os.Open(attachment.Path)
+			if err != nil {
+				return n, err
+			}
+			defer f.Close()
+
+			reader := bufio.NewReader(f)
+			base64Writer := base64.NewEncoder(base64.StdEncoding, writer)
+			defer base64Writer.Close()
+
+			return reader.WriteTo(base64Writer)
+		}()
+		n += nw2
 		if err != nil {
 			return n, err
 		}
-		reader := bufio.NewReader(f)
-		enc := base64.StdEncoding
-		base64Writer := base64.NewEncoder(enc, writer)
-		reader.WriteTo(base64Writer)
-		base64Writer.Close()
-		f.Close()
+
 		nw, err = writer.WriteString("\r\n\r\n")
 		n += int64(nw)
 		if err != nil {
 			return n, err
 		}
 	}
-	if b := writer.Buffered(); b > 0 {
-		writer.Flush()
-	}
+
 	return n, nil
 }
