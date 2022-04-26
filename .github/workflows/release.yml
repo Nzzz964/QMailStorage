@@ -1,5 +1,5 @@
 name: auto release binary
-on: 
+on:
   release:
     types: [published]
 jobs:
@@ -9,11 +9,14 @@ jobs:
     strategy:
       matrix:
         goos: [linux, windows, darwin]
-        goarch: ["386", amd64]
+        goarch: [arm, amd64]
+        exclude:
+          - goarch: arm
+            goos: darwin
     steps:
-    - uses: actions/checkout@v2
-    - uses: wangyoucao577/go-release-action@master
-      with:
-        github_token: ${{ secrets.RELEASE_TOKEN }}
-        goos: ${{ matrix.goos }}
-        goarch: ${{ matrix.goarch }}
+      - uses: actions/checkout@v2
+      - uses: wangyoucao577/go-release-action@master
+        with:
+          github_token: ${{ secrets.RELEASE_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
