@@ -28,7 +28,7 @@ type mimeText struct {
 	Sha1          string `json:"sha1"`
 	Chunksha1     string `json:"chunk_sha1"`
 	ChunkFilename string `json:"chunk_filename"`
-	Curr          int    `json:"sec"`
+	Curr          int    `json:"seq"`
 	Total         int    `json:"total"`
 	Desc          string `json:"desc"`
 	Guid          string `json:"guid"`
